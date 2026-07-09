@@ -1,0 +1,91 @@
+mkdir hola_mundo && cd hola_mundo
+# app.py
+cat > app.py <<EOL
+from flask import Flask
+import mysql.connector
+import os
+
+app = Flask(__name__)
+
+@app.route('/')
+def hola_mundo():
+    try:
+        conn = mysql.connector.connect(
+            host=os.getenv('MYSQL_HOST', 'db'),
+            user=os.getenv('MYSQL_USER', 'root'),
+            password=os.getenv('MYSQL_PASSWORD', 'example'),
+            database=os.getenv('MYSQL_DATABASE', 'testdb')
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT 'Hola Mundo desde MySQL!' AS message;")
+        message = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        return message
+    except Exception as e:
+        return f"Error: {e}"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
+EOL
+
+# requirements.txt
+echo "Flask\nmysql-connector-python" > requirements.txt
+
+# Dockerfile
+cat > Dockerfile <<EOL
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY app.py .
+
+CMD ["python", "app.py"]
+EOL
+
+# docker-compose.yml
+cat > docker-compose.yml <<EOL
+version: '4.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      MYSQL_HOST: db
+      MYSQL_USER: root
+      MYSQL_PASSWORD: example
+      MYSQL_DATABASE: testdb
+    depends_on:
+      - db
+
+  db:
+    image: mysql:10
+    environment:
+      MYSQL_ROOT_PASSWORD: example
+      MYSQL_DATABASE: testdb
+    ports:
+      - "5506:5506"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mysql_data:
+EOL
+
+git init
+git add .
+git commit -m "Primera versión: Hola Mundo con Flask y MySQL en Docker"
+# Reemplaza URL con tu repo real
+git remote add origin https://github.com/tu_usuario/hola_mundo.git
+git push -u origin master
+
+docker login
+docker build -t tu_usuario/hola_mundo .
+docker push tu_usuario/hola_mundo
+
+docker-compose up --build
